@@ -51,11 +51,3 @@ package-lock.json
 data/*.sqlite-shm
 data/*.sqlite-wal
 data/backup/
-
-# Local SQLite DB created during development (added in reward feature commit)
-/data/*.sqlite*
-
-# Daily login artifacts and backups (durable)
-data/*.sqlite-shm
-data/*.sqlite-wal
-data/backup/
