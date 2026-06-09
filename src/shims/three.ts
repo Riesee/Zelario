@@ -8,6 +8,8 @@ const Mock = class {
   add() {}
   position = { set: () => undefined, x: 0, y: 0, z: 0 };
   rotation = { x: 0, y: 0, z: 0 };
+  aspect = 1;
+  updateProjectionMatrix() {}
 };
 
 export class Color {
