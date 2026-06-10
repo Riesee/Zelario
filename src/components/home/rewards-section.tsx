@@ -1,10 +1,12 @@
 "use client"
 
-import { useEffect, useRef } from "react"
+import { useEffect, useRef, useState } from "react"
+import { useRouter } from "next/navigation"
 import { gsap } from "gsap"
 import { ScrollTrigger } from "gsap/ScrollTrigger"
 import { Gift, Award, Star, Zap, ChevronRight } from "lucide-react"
 import { Button } from "@/components/ui/button"
+import { useWalletSession } from "@/hooks/use-wallet-session"
 import { Card, CardContent } from "@/components/ui/card"
 
 gsap.registerPlugin(ScrollTrigger)
@@ -39,6 +41,77 @@ const rewards = [
         border: "group-hover:border-pink-500/50",
     },
 ]
+
+function DailyLoginArea() {
+    const { displayAddress } = useWalletSession()
+    const router = useRouter()
+    const [status, setStatus] = useState<{ eligible: boolean; lastClaimDate: string | null; rewardAmount: number } | null>(null)
+    const [loading, setLoading] = useState(false)
+
+    useEffect(() => {
+        if (displayAddress) fetchStatus()
+        else setStatus(null)
+    }, [displayAddress])
+
+    async function fetchStatus() {
+        try {
+            const res = await fetch('/api/rewards/daily-login', { headers: { 'x-demo-address': displayAddress || '' } })
+            if (res.ok) {
+                const j = await res.json()
+                setStatus(j)
+            } else {
+                setStatus(null)
+            }
+        } catch (e) {
+            setStatus(null)
+        }
+    }
+
+    async function claim() {
+        if (!displayAddress) return
+        setLoading(true)
+        try {
+            const res = await fetch('/api/rewards/daily-login/claim', { method: 'POST', headers: { 'x-demo-address': displayAddress } })
+            const j = await res.json()
+            if (res.ok) {
+                setStatus({ eligible: false, lastClaimDate: new Date().toISOString().split('T')[0], rewardAmount: j.rewardAmount })
+            } else {
+                // refresh status
+                fetchStatus()
+            }
+        } catch (e) {
+            // ignore
+        } finally {
+            setLoading(false)
+        }
+    }
+
+    return (
+        <div className="relative z-10 mt-4">
+            {!displayAddress ? (
+                <div className="flex justify-center">
+                    <Button
+                        size="sm"
+                        className="bg-yellow-400 text-black hover:bg-yellow-500 font-medium"
+                        onClick={() => router.push('/user/login')}
+                    >
+                        Connect Wallet
+                    </Button>
+                </div>
+            ) : status ? (
+                <div className="flex flex-col items-center gap-2">
+                    <p className="text-sm text-gray-300">Last claim: {status.lastClaimDate ?? 'Never'}</p>
+                    <p className="text-sm text-gray-300">Amount: {status.rewardAmount}</p>
+                    <Button size="sm" onClick={claim} disabled={!status.eligible || loading}>
+                        {status.eligible ? (loading ? 'Claiming…' : 'Claim Reward') : 'Already claimed'}
+                    </Button>
+                </div>
+            ) : (
+                <p className="text-sm text-gray-400">Loading...</p>
+            )}
+        </div>
+    )
+}
 
 export default function RewardsSection() {
     const sectionRef = useRef<HTMLElement>(null)
@@ -116,6 +189,9 @@ export default function RewardsSection() {
                                 <p className="relative z-10 text-gray-400 text-sm leading-relaxed">
                                     {reward.description}
                                 </p>
+
+                                {/* Daily Login integration for the first card */}
+                                {index === 0 && <DailyLoginArea />}
                             </CardContent>
                         </Card>
                     ))}

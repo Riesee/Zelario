@@ -43,3 +43,11 @@ next-env.d.ts
 DEX_SETUP_GUIDE.txt
 tester-codes
 package-lock.json
+ 
+# Local SQLite DB created during development
+/data/*.sqlite*
+
+# Daily login artifacts and backups
+data/*.sqlite-shm
+data/*.sqlite-wal
+data/backup/

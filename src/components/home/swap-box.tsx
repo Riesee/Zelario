@@ -60,9 +60,15 @@ export default function SwapBox() {
         })
         const response = await fetch(
           `https://api.coingecko.com/api/v3/coins/markets?${params}`,
-          { signal: controller.signal }
+          { signal: controller.signal, mode: "cors", headers: { Accept: "application/json" } }
         )
-        if (!response.ok) return
+        if (!response.ok) {
+          console.warn("CoinGecko response not OK", response.status)
+          // Use fallback data when API fails
+          setFromCoin(fallbackCoins[0])
+          setToCoin(fallbackCoins[1])
+          return
+        }
         const data = (await response.json()) as Coin[]
         if (Array.isArray(data)) {
           const btc = data.find((c) => c.id === "bitcoin")
@@ -75,7 +81,14 @@ export default function SwapBox() {
         }
       } catch (error) {
         if ((error as Error).name !== "AbortError") {
-          console.error("Failed to fetch coins:", error)
+          if (typeof navigator !== "undefined" && !navigator.onLine) {
+            console.warn("Offline: cannot fetch coin prices")
+          } else {
+            console.warn("Failed to fetch coins:", error)
+          }
+          // Ensure UI remains usable with fallback values
+          setFromCoin(fallbackCoins[0])
+          setToCoin(fallbackCoins[1])
         }
       } finally {
         setIsLoading(false)
