@@ -26,6 +26,5 @@ export function useGSAP(
     return () => {
       ctx.revert();
     };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, options?.dependencies ?? []);
 }

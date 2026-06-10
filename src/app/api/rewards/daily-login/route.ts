@@ -4,6 +4,15 @@ import jwt from "jsonwebtoken"
 
 const JWT_SECRET = process.env.JWT_SECRET || "dev-secret"
 
+function hasAddress(value: unknown): value is { address: string } {
+  return (
+    typeof value === "object" &&
+    value !== null &&
+    "address" in value &&
+    typeof value.address === "string"
+  )
+}
+
 function getTodayIso() {
   return new Date().toISOString().split("T")[0]
 }
@@ -14,8 +23,8 @@ function getAddressFromReq(req: NextRequest): string | null {
   if (auth && auth.startsWith("Bearer ")) {
     try {
       const token = auth.slice("Bearer ".length)
-      const decoded: any = jwt.verify(token, JWT_SECRET)
-      if (decoded && decoded.address) return decoded.address
+      const decoded = jwt.verify(token, JWT_SECRET)
+      if (hasAddress(decoded)) return decoded.address
     } catch (e) {
       // invalid token, continue to other checks
     }
