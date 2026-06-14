@@ -1,22 +1,19 @@
 "use client"
 
-import { useEffect, useRef } from "react"
+import { useEffect, useRef, useState } from "react"
 import { gsap } from "gsap"
 import { ScrollTrigger } from "gsap/ScrollTrigger"
-import { Gift, Award, Star, Zap, ChevronRight } from "lucide-react"
+import { Gift, Award, Star, Zap, ChevronRight, Loader2 } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent } from "@/components/ui/card"
 
+import { fetchDailyRewardStatus, claimDailyReward } from "@/services/rewardApiService"
+import { DailyRewardStatus } from "@/types/user/reward.types"
+import { useRouter } from 'next/navigation'
+
 gsap.registerPlugin(ScrollTrigger)
 
-const rewards = [
-    {
-        title: "Daily Login Bonus",
-        description: "Earn 10 XP daily just for checking in.",
-        icon: <Gift className="w-8 h-8 text-purple-400" />,
-        color: "from-purple-500/20 to-indigo-500/20",
-        border: "group-hover:border-purple-500/50",
-    },
+const staticRewards = [
     {
         title: "Trading Milestones",
         description: "Unlock exclusive badges by reaching trade volume goals.",
@@ -41,8 +38,51 @@ const rewards = [
 ]
 
 export default function RewardsSection() {
+    const router = useRouter();
     const sectionRef = useRef<HTMLElement>(null)
     const cardsRef = useRef<HTMLDivElement>(null)
+
+    const [dailyStatus, setDailyStatus] = useState<DailyRewardStatus | null>(null)
+    const [isPageLoading, setIsPageLoading] = useState(true)
+    const [isActionLoading, setIsActionLoading] = useState(false)
+    const [feedbackMessage, setFeedbackMessage] = useState("")
+    const [isError, setIsError] = useState(false)
+
+    const loadRewardData = async () => {
+        const result = await fetchDailyRewardStatus()
+        if (result.success && result.data) {
+            setDailyStatus(result.data)
+        } else {
+            console.error(result.error)
+        }
+        setIsPageLoading(false)
+    }
+
+    useEffect(() => {
+        loadRewardData()
+    }, [])
+
+    // —— Handle Claim Interactivity ——
+    const handleClaimClick = async (e: React.MouseEvent) => {
+        e.stopPropagation()
+        setFeedbackMessage("")
+        setIsError(false)
+        setIsActionLoading(true)
+
+        const result = await claimDailyReward()
+        if (result.success && result.data) {
+            setFeedbackMessage(result.data.message || "Reward claimed successfully!")
+            await loadRewardData()
+        } else {
+            setIsError(true)
+            if (result.error?.toLowerCase().includes("unauthorized")) {
+                router.push("/user/login");
+                return;
+            }
+            setFeedbackMessage(result.error || "Claim verification failed.")
+        }
+        setIsActionLoading(false)
+    }
 
     useEffect(() => {
         const ctx = gsap.context(() => {
@@ -82,7 +122,6 @@ export default function RewardsSection() {
 
     return (
         <section ref={sectionRef} className="py-24 px-4 sm:px-6 lg:px-8 bg-black relative overflow-hidden">
-            {/* Background Elements */}
             <div className="absolute top-0 right-0 w-1/3 h-full bg-gradient-to-l from-purple-900/10 to-transparent pointer-events-none" />
             <div className="absolute bottom-0 left-0 w-1/3 h-full bg-gradient-to-r from-blue-900/10 to-transparent pointer-events-none" />
 
@@ -97,19 +136,79 @@ export default function RewardsSection() {
                 </div>
 
                 <div ref={cardsRef} className="grid md:grid-cols-2 lg:grid-cols-4 gap-6 mb-12">
-                    {rewards.map((reward, index) => (
+                    
+                    <Card
+                        className={`reward-card group bg-gray-900/50 backdrop-blur-sm border-gray-800 transition-all duration-300 hover:transform hover:-translate-y-2 hover:shadow-2xl ${
+                            dailyStatus?.eligible ? "hover:border-purple-500/50" : ""
+                        }`}
+                    >
+                        <CardContent className="p-6 h-full flex flex-col items-center text-center relative overflow-hidden justify-between min-h-[350px]">
+                            <div className="absolute inset-0 bg-gradient-to-br from-purple-500/20 to-indigo-500/20 opacity-0 group-hover:opacity-100 transition-opacity duration-500" />
+
+                            <div className="w-full flex flex-col items-center">
+                                <div className="relative z-10 bg-gray-900 p-4 rounded-full mb-6 group-hover:bg-gray-800 transition-colors">
+                                    <Gift className="w-8 h-8 text-purple-400" />
+                                </div>
+
+                                <h3 className="relative z-10 text-xl font-bold text-white mb-3 group-hover:text-transparent bg-clip-text bg-gradient-to-r from-white to-gray-300">
+                                    Daily Login Bonus
+                                </h3>
+
+                                <p className="relative z-10 text-gray-400 text-sm leading-relaxed mb-2">
+                                    Earn {dailyStatus?.rewardAmount ?? 10} XP daily just for checking in.
+                                </p>
+
+                                {dailyStatus?.lastClaimDate && (
+                                    <p className="relative z-10 text-[10px] font-mono text-gray-500">
+                                        Last Check-In: {dailyStatus.lastClaimDate}
+                                    </p>
+                                )}
+                            </div>
+
+                            <div className="relative z-10 w-full mt-6">
+                                {isPageLoading ? (
+                                    <Button disabled className="w-full bg-gray-800 text-gray-600 rounded-xl">
+                                        <Loader2 className="w-4 h-4 animate-spin mr-2" /> Syncing...
+                                    </Button>
+                                ) : (
+                                    <Button
+                                        onClick={handleClaimClick}
+                                        disabled={!dailyStatus?.eligible || isActionLoading}
+                                        className={`w-full py-2.5 rounded-xl font-semibold transition-all text-sm ${
+                                            dailyStatus?.eligible
+                                                ? "bg-purple-600 hover:bg-purple-500 text-white shadow-md active:scale-95"
+                                                : "bg-gray-800/90 text-gray-500 cursor-not-allowed border border-gray-700/40"
+                                        }`}
+                                    >
+                                        {isActionLoading && <Loader2 className="w-4 h-4 animate-spin mr-2" />}
+                                        {dailyStatus?.eligible ? "Claim Bonus" : "Claimed Today"}
+                                    </Button>
+                                )}
+
+                                {feedbackMessage && (
+                                    <p className={`mt-2 text-xs font-medium text-center ${
+                                        isError ? "text-red-400" : "text-green-400"
+                                    }`}>
+                                        {feedbackMessage}
+                                    </p>
+                                )}
+                            </div>
+                        </CardContent>
+                    </Card>
+
+                    {staticRewards.map((reward, index) => (
                         <Card
                             key={index}
                             className={`reward-card group bg-gray-900/50 backdrop-blur-sm border-gray-800 transition-all duration-300 hover:transform hover:-translate-y-2 hover:shadow-2xl ${reward.border}`}
                         >
-                            <CardContent className="p-6 h-full flex flex-col items-center text-center relative overflow-hidden">
+                            <CardContent className="p-6 h-full flex flex-col items-center text-center relative overflow-hidden min-h-[350px]">
                                 <div className={`absolute inset-0 bg-gradient-to-br ${reward.color} opacity-0 group-hover:opacity-100 transition-opacity duration-500`} />
 
                                 <div className="relative z-10 bg-gray-900 p-4 rounded-full mb-6 group-hover:bg-gray-800 transition-colors">
                                     {reward.icon}
                                 </div>
 
-                                <h3 className="relative z-10 text-xl font-bold text-white mb-3 group-hover:text-transparent group-hover:bg-clip-text group-hover:bg-gradient-to-r group-hover:from-white group-hover:to-gray-300">
+                                <h3 className="relative z-10 text-xl font-bold text-white mb-3 group-hover:text-transparent bg-clip-text bg-gradient-to-r from-white to-gray-300">
                                     {reward.title}
                                 </h3>
 

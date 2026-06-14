@@ -10,15 +10,17 @@ let handlerCache: Handler[] | null = null;
 
 async function loadHandlers(): Promise<Handler[]> {
   if (handlerCache) return handlerCache;
-  const [user, admin, communityAdmin] = await Promise.all([
+  const [user, admin, communityAdmin, reward] = await Promise.all([
     import("./handlers/user"),
     import("./handlers/admin"),
     import("./handlers/community-admin"),
+    import("./handlers/reward"),
   ]);
   handlerCache = [
     user.handleUserApi,
     admin.handleAdminApi,
     communityAdmin.handleCommunityAdminApi,
+    reward.handleRewardApi,
   ];
   return handlerCache;
 }
